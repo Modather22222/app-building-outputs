@@ -1,7 +1,7 @@
 name: tip_splitter
-description: A bill splitter that divides a total among N people with a round-up option.
+description: A bill splitter that divides a total among N people, with an option to round each share up.
 publish_to: none
-version: 1.0.0+1
+version: 0.1.0
 
 environment:
   sdk: ">=3.5.0 <4.0.0"
@@ -13,6 +13,7 @@ dependencies:
 dev_dependencies:
   flutter_test:
     sdk: flutter
+  flutter_lints: ^6.0.0
 
 flutter:
   uses-material-design: true

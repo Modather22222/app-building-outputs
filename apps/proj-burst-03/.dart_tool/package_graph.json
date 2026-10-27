@@ -5,12 +5,20 @@
   "packages": [
     {
       "name": "tip_splitter",
-      "version": "1.0.0+1",
+      "version": "0.1.0",
       "dependencies": [
         "flutter"
       ],
       "devDependencies": [
+        "flutter_lints",
         "flutter_test"
+      ]
+    },
+    {
+      "name": "flutter_lints",
+      "version": "6.0.0",
+      "dependencies": [
+        "lints"
       ]
     },
     {
@@ -120,6 +128,11 @@
     {
       "name": "characters",
       "version": "1.4.1",
+      "dependencies": []
+    },
+    {
+      "name": "lints",
+      "version": "6.1.0",
       "dependencies": []
     },
     {

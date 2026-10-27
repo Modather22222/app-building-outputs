@@ -1,8 +1,66 @@
 import 'package:flutter/material.dart';
-import 'package:flutter/services.dart';
 
 void main() {
   runApp(const TipSplitterApp());
+}
+
+class SplitterModel extends ChangeNotifier {
+  double _amount = 0;
+  int _people = 2;
+  bool _roundUp = false;
+
+  static const int _minPeople = 1;
+  static const int _maxPeople = 20;
+
+  double get amount => _amount;
+  int get people => _people;
+  bool get roundUp => _roundUp;
+
+  double get rawShare => _people > 0 ? _amount / _people : 0;
+
+  int get perPerson {
+    if (_roundUp) return _amount > 0 ? rawShare.ceil() : 0;
+    return 0;
+  }
+
+  double get sharePerPerson {
+    if (_roundUp) return perPerson.toDouble();
+    return rawShare;
+  }
+
+  double get collectedTotal {
+    if (_roundUp) return (perPerson * _people).toDouble();
+    return _amount;
+  }
+
+  double get extraTotal => collectedTotal - _amount;
+
+  bool get canAddPeople => _people < _maxPeople;
+  bool get canRemovePeople => _people > _minPeople;
+
+  void setAmount(double value) {
+    _amount = value.isNaN || value < 0 ? 0 : value;
+    notifyListeners();
+  }
+
+  void incrementPeople() {
+    if (canAddPeople) {
+      _people++;
+      notifyListeners();
+    }
+  }
+
+  void decrementPeople() {
+    if (canRemovePeople) {
+      _people--;
+      notifyListeners();
+    }
+  }
+
+  void toggleRoundUp(bool value) {
+    _roundUp = value;
+    notifyListeners();
+  }
 }
 
 class TipSplitterApp extends StatelessWidget {
@@ -12,154 +70,139 @@ class TipSplitterApp extends StatelessWidget {
   Widget build(BuildContext context) {
     return MaterialApp(
       title: 'Tip Splitter',
-      debugShowCheckedModeBanner: false,
       theme: ThemeData(useMaterial3: true, colorSchemeSeed: Colors.teal),
       darkTheme: ThemeData(
         useMaterial3: true,
-        brightness: Brightness.dark,
         colorSchemeSeed: Colors.teal,
+        brightness: Brightness.dark,
       ),
       themeMode: ThemeMode.system,
-      home: const SplitterPage(),
+      home: const SplitterScreen(),
     );
   }
 }
 
-class SplitterPage extends StatefulWidget {
-  const SplitterPage({super.key});
+class SplitterScreen extends StatefulWidget {
+  const SplitterScreen({super.key});
 
   @override
-  State<SplitterPage> createState() => _SplitterPageState();
+  State<SplitterScreen> createState() => _SplitterScreenState();
 }
 
-class _SplitterPageState extends State<SplitterPage> {
-  final TextEditingController _totalController = TextEditingController();
-  int _people = 2;
-  bool _roundUp = false;
-
-  double get _total {
-    final value = double.tryParse(_totalController.text.trim());
-    return value == null || value < 0 ? 0 : value;
-  }
-
-  double get _perPerson {
-    if (_people < 1 || _total <= 0) return 0;
-    final share = _total / _people;
-    return _roundUp
-        ? share.ceilToDouble()
-        : (share * 100).roundToDouble() / 100;
-  }
-
-  double get _grandTotal => _perPerson * _people;
-
-  double get _overage => _grandTotal - _total;
-
-  String _money(double value) => '\$${value.toStringAsFixed(2)}';
+class _SplitterScreenState extends State<SplitterScreen> {
+  final SplitterModel _model = SplitterModel();
+  final TextEditingController _amountController = TextEditingController();
 
   @override
   void dispose() {
-    _totalController.dispose();
+    _amountController.dispose();
+    _model.dispose();
     super.dispose();
+  }
+
+  void _onAmountChanged(String text) {
+    final value = double.tryParse(text.replaceAll(',', '.')) ?? 0;
+    _model.setAmount(value);
   }
 
   @override
   Widget build(BuildContext context) {
-    final colors = Theme.of(context).colorScheme;
     return Scaffold(
       appBar: AppBar(title: const Text('Tip Splitter')),
-      body: SafeArea(
-        child: ListView(
-          padding: const EdgeInsets.all(16),
+      body: ListenableBuilder(
+        listenable: _model,
+        builder: (context, _) {
+          return ListView(
+            padding: const EdgeInsets.all(16),
+            children: [
+              TextField(
+                controller: _amountController,
+                keyboardType: const TextInputType.numberWithOptions(
+                  decimal: true,
+                ),
+                decoration: const InputDecoration(
+                  labelText: 'Total amount',
+                  prefixText: '\$ ',
+                  border: OutlineInputBorder(),
+                ),
+                onChanged: _onAmountChanged,
+              ),
+              const SizedBox(height: 16),
+              Row(
+                children: [
+                  const Text('People', style: TextStyle(fontSize: 16)),
+                  const Spacer(),
+                  IconButton(
+                    icon: const Icon(Icons.remove_circle_outline),
+                    onPressed: _model.canRemovePeople
+                        ? _model.decrementPeople
+                        : null,
+                  ),
+                  Text('${_model.people}', style: const TextStyle(fontSize: 20)),
+                  IconButton(
+                    icon: const Icon(Icons.add_circle_outline),
+                    onPressed: _model.canAddPeople ? _model.incrementPeople : null,
+                  ),
+                ],
+              ),
+              SwitchListTile(
+                title: const Text('Round up each share'),
+                subtitle: const Text('Round each person\'s share up to the next dollar'),
+                value: _model.roundUp,
+                onChanged: _model.toggleRoundUp,
+                contentPadding: EdgeInsets.zero,
+              ),
+              const SizedBox(height: 8),
+              _ResultCard(model: _model),
+            ],
+          );
+        },
+      ),
+    );
+  }
+}
+
+class _ResultCard extends StatelessWidget {
+  const _ResultCard({required this.model});
+
+  final SplitterModel model;
+
+  String _format(double value) => '\$${value.toStringAsFixed(2)}';
+
+  @override
+  Widget build(BuildContext context) {
+    final theme = Theme.of(context);
+    final share = model.sharePerPerson;
+    return Card(
+      child: Padding(
+        padding: const EdgeInsets.all(16),
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.stretch,
           children: [
-            TextField(
-              controller: _totalController,
-              keyboardType:
-                  const TextInputType.numberWithOptions(decimal: true),
-              inputFormatters: [
-                FilteringTextInputFormatter.allow(
-                  RegExp(r'^\d*\.?\d{0,2}'),
-                ),
+            Text('Per person', style: theme.textTheme.titleMedium),
+            const SizedBox(height: 8),
+            Text(
+              share > 0 ? _format(share) : '—',
+              style: theme.textTheme.displaySmall?.copyWith(
+                fontWeight: FontWeight.bold,
+              ),
+            ),
+            const Divider(height: 24),
+            Row(
+              mainAxisAlignment: MainAxisAlignment.spaceBetween,
+              children: [
+                const Text('Collected total'),
+                Text(_format(model.collectedTotal)),
               ],
-              decoration: const InputDecoration(
-                labelText: 'Bill total',
-                prefixText: r'$ ',
-                border: OutlineInputBorder(),
+            ),
+            if (model.roundUp && model.extraTotal > 0)
+              Row(
+                mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                children: [
+                  const Text('Extra from rounding'),
+                  Text(_format(model.extraTotal)),
+                ],
               ),
-              onChanged: (_) => setState(() {}),
-            ),
-            const SizedBox(height: 12),
-            Card(
-              child: Padding(
-                padding: const EdgeInsets.symmetric(horizontal: 8),
-                child: Row(
-                  children: [
-                    IconButton(
-                      tooltip: 'Fewer people',
-                      onPressed:
-                          _people > 1 ? () => setState(() => _people--) : null,
-                      icon: const Icon(Icons.remove_circle_outline),
-                    ),
-                    Expanded(
-                      child: Column(
-                        children: [
-                          Text(
-                            '$_people',
-                            style: Theme.of(context)
-                                .textTheme
-                                .headlineMedium
-                                ?.copyWith(fontWeight: FontWeight.bold),
-                          ),
-                          const Text('people'),
-                        ],
-                      ),
-                    ),
-                    IconButton(
-                      tooltip: 'More people',
-                      onPressed:
-                          _people < 99 ? () => setState(() => _people++) : null,
-                      icon: const Icon(Icons.add_circle_outline),
-                    ),
-                  ],
-                ),
-              ),
-            ),
-            SwitchListTile(
-              title: const Text('Round up each share'),
-              subtitle: const Text('Whole amounts per person'),
-              value: _roundUp,
-              onChanged: (value) => setState(() => _roundUp = value),
-            ),
-            const SizedBox(height: 12),
-            Card(
-              color: colors.primaryContainer,
-              child: Padding(
-                padding: const EdgeInsets.all(20),
-                child: Column(
-                  children: [
-                    Text(
-                      'Each person pays',
-                      style: Theme.of(context).textTheme.titleMedium,
-                    ),
-                    const SizedBox(height: 4),
-                    Text(
-                      _money(_perPerson),
-                      key: const ValueKey('per-person'),
-                      style: Theme.of(context)
-                          .textTheme
-                          .displaySmall
-                          ?.copyWith(fontWeight: FontWeight.bold),
-                    ),
-                    const SizedBox(height: 8),
-                    Text(
-                      _overage > 0.004
-                          ? '${_money(_grandTotal)} collected, '
-                              '${_money(_overage)} extra toward the bill'
-                          : '${_money(_grandTotal)} total',
-                    ),
-                  ],
-                ),
-              ),
-            ),
           ],
         ),
       ),
