@@ -17,7 +17,7 @@ permissions:
 
 jobs:
   build-apk:
-    name: Build APK (apps/proj-stress-03)
+    name: Build APK (apps/proj-burst-03)
     runs-on: ubuntu-latest
     timeout-minutes: 20
     steps:
@@ -44,7 +44,7 @@ jobs:
           # Generated projects contain only lib/ + pubspec.yaml + tests —
           # scaffold Android here so the agent never hand-writes gradle.
           if [ ! -d android ]; then
-            flutter create . --platforms android --org com.appfactory --project-name expense_log
+            flutter create . --platforms android --org com.appfactory --project-name tip_splitter
           fi
           MAN=android/app/src/main/AndroidManifest.xml
           if ! grep -q 'android.permission.INTERNET' "$MAN"; then
